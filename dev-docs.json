@@ -1,4 +1,45 @@
 {
+  "quickDoc": {
+    "variablesAndFunctions": {
+      "prompts": [
+        {
+          "question": "does this code use a third party libary",
+          "title": "Third Party libaries"
+        }
+      ]
+    }
+  },
+  "ai": {
+    "internalTypeFilters": [
+      "file",
+      "module",
+      "namespace",
+      "package",
+      "class",
+      "method",
+      "property",
+      "field",
+      "constructor",
+      "enum",
+      "interface",
+      "function",
+      "variable",
+      "constant",
+      "string",
+      "number",
+      "boolean",
+      "array",
+      "object",
+      "key",
+      "null",
+      "enummember",
+      "struct",
+      "event",
+      "operator",
+      "typeParameter"
+    ],
+    "contextPrompt": "can you write a poem on this codefile"
+  },
   "gitHubApp": {
     "workflows": ["generateDocs"]
   }
