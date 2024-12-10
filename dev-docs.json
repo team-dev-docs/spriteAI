@@ -38,7 +38,7 @@
       "operator",
       "typeParameter"
     ],
-    "contextPrompt": "can you write a poem on this codefile"
+    "contextPrompt": "can you write overview of this codefile and provide mermaid diagram of how it works"
   },
   "gitHubApp": {
     "workflows": ["generateDocs"]
