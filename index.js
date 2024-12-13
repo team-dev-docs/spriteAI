@@ -227,40 +227,5 @@ export const sprite = {
 
         //   image_url = response.data.data[0].url; nice!
         //   return image_url
-    },
-    async generateHouseAsset(description, options) {
-        const dalle3 = openAiObject.images
-      //adds some stuff!!!! ok ok yeash
-        if(options.iterations) {
-          let i = 0;
-          let iterations = []
-          while (i < options.iterations) {
-            console.log(i);
-            let response = await dalle3.generate({
-              model: "dall-e-3",
-              prompt: `Generate a 2D asset that I could use with a phaser JS game depitcing a (an) ${description}.
-              `,
-              n: 1,
-              size: options?.size || "1024x1024",
-            });
-            iterations.push(response)
-            i++; // update
-          }
-
-
-          return iterations
-
-
-        } else {
-          const response = await dalle3.generate({
-            model: "dall-e-3",
-            prompt: `Generate a 2D asset that I could use with a phaser JS game depitcing a (an) ${description}.
-            `,
-            n: 1,
-            size: options?.size || "1024x1024",
-          });
-          console.log(response)
-          return response
-        }
     }
 }
