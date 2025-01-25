@@ -16,8 +16,5 @@
       "method"
     ],
     "contextPrompt": "can you write overview of this codefile and provide mermaid diagram of how it works"
-  },
-  "gitHubApp": {
-    "workflows": ["generateDocs", "generateChangelog"]
   }
 }
