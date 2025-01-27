@@ -394,6 +394,69 @@ async function createReflection(imageBuffer, reflectionOptions = {}) {
     .toBuffer();
 }
 
+async function createWaveDistortion(imageBuffer, waveOptions = {}) {
+  const {
+    amplitude = 10,
+    frequency = 0.1,
+    phase = 0,
+    direction = 'horizontal',
+    animationFrames = 1
+  } = waveOptions;
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const frames = [];
+
+  for (let frame = 0; frame < animationFrames; frame++) {
+    const { data, info } = await sharp(imageBuffer)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const newData = Buffer.alloc(data.length);
+    const framePhase = phase + (frame * Math.PI * 2 / animationFrames);
+
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const sourceIdx = (y * info.width + x) * 4;
+        
+        // Skip if pixel is fully transparent
+        if (data[sourceIdx + 3] === 0) {
+          newData[sourceIdx] = 0;
+          newData[sourceIdx + 1] = 0;
+          newData[sourceIdx + 2] = 0;
+          newData[sourceIdx + 3] = 0;
+          continue;
+        }
+
+        // Calculate wave offset
+        const waveOffset = Math.sin(
+          (direction === 'horizontal' ? y : x) * frequency + framePhase
+        ) * amplitude;
+
+        // Apply offset
+        const targetX = Math.round(x + (direction === 'horizontal' ? waveOffset : 0));
+        const targetY = Math.round(y + (direction === 'vertical' ? waveOffset : 0));
+
+        // Check bounds
+        if (targetX >= 0 && targetX < info.width && targetY >= 0 && targetY < info.height) {
+          const targetIdx = (targetY * info.width + targetX) * 4;
+          newData[targetIdx] = data[sourceIdx];
+          newData[targetIdx + 1] = data[sourceIdx + 1];
+          newData[targetIdx + 2] = data[sourceIdx + 2];
+          newData[targetIdx + 3] = data[sourceIdx + 3];
+        }
+      }
+    }
+
+    const frame = await sharp(newData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    frames.push(frame);
+  }
+
+  return frames;
+}
+
 // Usage
 
 export const sprite = {
@@ -914,6 +977,18 @@ export const sprite = {
       return {
         original: baseSprite.image,
         withReflection: `data:image/png;base64,${withReflection.toString('base64')}`
+      };
+    },
+
+    async addWaveEffect(description, waveOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const waveFrames = await createWaveDistortion(imgBuffer, waveOptions);
+      
+      return {
+        original: baseSprite.image,
+        waveFrames: waveFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        frameCount: waveFrames.length
       };
     }
 };
