@@ -20,5 +20,6 @@
   "gitHubApp": {
     "connectedOrg": "spriteai",
     "userDocsWorkflows": ["generateUserDocs"]
+    "issues": true
   }
 }
