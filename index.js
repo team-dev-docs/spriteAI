@@ -101,6 +101,71 @@ async function generateSpriteMetadata(imageBuffer, frameWidth, frameHeight) {
   };
 }
 
+// Add these new utility functions before the sprite object
+async function createParticleEffect(imageBuffer, particleCount = 10) {
+  const metadata = await sharp(imageBuffer).metadata();
+  const particles = [];
+  
+  // Create smaller versions of the sprite for particles
+  for (let i = 0; i < particleCount; i++) {
+    const size = Math.max(metadata.width / (4 + Math.random() * 4), 4);
+    const particle = await sharp(imageBuffer)
+      .resize(Math.round(size), Math.round(size))
+      .rotate(Math.random() * 360)
+      .toBuffer();
+    particles.push(particle);
+  }
+  
+  return particles;
+}
+
+async function flipSprite(imageBuffer, direction = 'horizontal') {
+  return await sharp(imageBuffer)
+    .flip(direction === 'vertical')
+    .flop(direction === 'horizontal')
+    .toBuffer();
+}
+
+async function createColorCyclingAnimation(imageBuffer, colorShift = 30) {
+  const frames = [];
+  for (let i = 0; i < 360; i += colorShift) {
+    const frame = await sharp(imageBuffer)
+      .modulate({
+        hue: i
+      })
+      .toBuffer();
+    frames.push(frame);
+  }
+  return frames;
+}
+
+async function combineSprites(spriteBufferA, spriteBufferB, position = 'overlay') {
+  const composite = [];
+  
+  switch (position) {
+    case 'side-by-side':
+      return await sharp(spriteBufferA)
+        .extend({
+          right: (await sharp(spriteBufferB).metadata()).width,
+          background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .composite([{ input: spriteBufferB, gravity: 'east' }])
+        .toBuffer();
+    case 'stacked':
+      return await sharp(spriteBufferA)
+        .extend({
+          bottom: (await sharp(spriteBufferB).metadata()).height,
+          background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .composite([{ input: spriteBufferB, gravity: 'south' }])
+        .toBuffer();
+    default: // overlay
+      return await sharp(spriteBufferA)
+        .composite([{ input: spriteBufferB, gravity: 'center' }])
+        .toBuffer();
+  }
+}
+
 // Usage
 
 export const sprite = {
@@ -119,7 +184,7 @@ export const sprite = {
               Other Instructions:
 
               -The top half of the image should be the frames and the bottom half should be a blank white background with nothing in it.
-              -Style should resemble Super Nintendo graphics.
+              -Style should be retro pixel art.
               -The background of the image, and frame should just be the color white, with no extra items, lines, text, or grids.
               -The frames should be two rows with 3 columns each, so a 2 by 3 table.
               `,
@@ -235,7 +300,7 @@ export const sprite = {
             Other Instructions:
 
             -The top half of the image should be the frames and the bottom half should be a blank white background with nothing in it.
-            -Style should resemble Super Nintendo graphics.
+            -Style should be retro pixel art.
             -The background of the image, and frame should just be the color white, with no extra items, lines, text, or grids.
             -The frames should be two rows with 3 columns each, so a 2 by 3 table.
             `,
@@ -396,12 +461,12 @@ export const sprite = {
 
     async generateRetroConsole(description, consoleType, options = {}) {
         const consoleLimits = {
-            'nes': { colors: 54, resolution: '256x240' },
-            'snes': { colors: 256, resolution: '256x224' },
-            'gameboy': { colors: 4, resolution: '160x144' }
+            'genesis': { colors: 512, resolution: '320x224' },
+            'msx': { colors: 16, resolution: '256x192' },
+            'commodore64': { colors: 16, resolution: '320x200' }
         };
 
-        const console = consoleLimits[consoleType.toLowerCase()] || consoleLimits.nes;
+        const console = consoleLimits[consoleType.toLowerCase()] || consoleLimits.genesis;
         
         const openAiObject = new OpenAI();
         const response = await openAiObject.images.generate({
@@ -469,5 +534,42 @@ export const sprite = {
             image: `data:image/png;base64,${base64Image}`,
             url: response.data[0].url
         };
+    },
+
+    // Add these new methods to the sprite object
+    async generateParticleEffect(description, particleCount = 10, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const particles = await createParticleEffect(imgBuffer, particleCount);
+      
+      return {
+        baseSprite: baseSprite.image,
+        particles: particles.map(p => `data:image/png;base64,${p.toString('base64')}`)
+      };
+    },
+
+    async createColorCycle(description, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const frames = await createColorCyclingAnimation(imgBuffer);
+      
+      return {
+        baseSprite: baseSprite.image,
+        frames: frames.map(f => `data:image/png;base64,${f.toString('base64')}`)
+      };
+    },
+
+    async combineSprites(description1, description2, position = 'overlay', options = {}) {
+      const sprite1 = await this.generatePixelArt(description1, options);
+      const sprite2 = await this.generatePixelArt(description2, options);
+      
+      const buffer1 = Buffer.from(sprite1.image.split(',')[1], 'base64');
+      const buffer2 = Buffer.from(sprite2.image.split(',')[1], 'base64');
+      
+      const combined = await combineSprites(buffer1, buffer2, position);
+      
+      return {
+        image: `data:image/png;base64,${combined.toString('base64')}`
+      };
     }
 };
