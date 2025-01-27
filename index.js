@@ -331,6 +331,69 @@ async function interpolateFrames(frame1Buffer, frame2Buffer, steps = 5) {
   return frames;
 }
 
+async function createReflection(imageBuffer, reflectionOptions = {}) {
+  const {
+    opacity = 0.3,
+    fade = true,
+    flipY = true,
+    height = 0.5, // percentage of original height
+    offset = 0
+  } = reflectionOptions;
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const reflectionHeight = Math.round(metadata.height * height);
+
+  // Create the reflection
+  let reflection = await sharp(imageBuffer)
+    .flip(flipY)
+    .resize({ height: reflectionHeight, fit: 'contain' })
+    .toBuffer();
+
+  if (fade) {
+    // Create a gradient for fading
+    const gradient = Buffer.alloc(metadata.width * reflectionHeight * 4);
+    for (let y = 0; y < reflectionHeight; y++) {
+      const alpha = Math.round(255 * (1 - (y / reflectionHeight)) * opacity);
+      for (let x = 0; x < metadata.width; x++) {
+        const idx = (y * metadata.width + x) * 4;
+        gradient[idx + 3] = alpha;
+      }
+    }
+
+    reflection = await sharp(reflection)
+      .composite([{
+        input: {
+          create: {
+            width: metadata.width,
+            height: reflectionHeight,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          }
+        },
+        blend: 'multiply',
+        raw: {
+          width: metadata.width,
+          height: reflectionHeight,
+          channels: 4
+        },
+        data: gradient
+      }])
+      .toBuffer();
+  }
+
+  // Combine original image with reflection
+  return await sharp(imageBuffer)
+    .extend({
+      bottom: reflectionHeight + offset,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    .composite([{
+      input: reflection,
+      top: metadata.height + offset
+    }])
+    .toBuffer();
+}
+
 // Usage
 
 export const sprite = {
@@ -840,6 +903,17 @@ export const sprite = {
         originalFrames: frames.map(f => f.image),
         interpolatedFrames,
         totalFrames: interpolatedFrames.length
+      };
+    },
+
+    async addReflectionEffect(description, reflectionOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const withReflection = await createReflection(imgBuffer, reflectionOptions);
+      
+      return {
+        original: baseSprite.image,
+        withReflection: `data:image/png;base64,${withReflection.toString('base64')}`
       };
     }
 };
