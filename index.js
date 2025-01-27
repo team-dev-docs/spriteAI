@@ -166,6 +166,76 @@ async function combineSprites(spriteBufferA, spriteBufferB, position = 'overlay'
   }
 }
 
+// New utility functions
+async function generateOutline(imageBuffer, outlineColor = { r: 0, g: 0, b: 0, alpha: 255 }, thickness = 1) {
+  const original = await sharp(imageBuffer).toBuffer();
+  const dilated = await sharp(imageBuffer)
+    .dilate(thickness)
+    .toBuffer();
+  
+  return await sharp(dilated)
+    .composite([{ input: original, blend: 'dest-out' }])
+    .negate({ alpha: false })
+    .tint(outlineColor)
+    .toBuffer();
+}
+
+async function pixelSort(imageBuffer, sortMode = 'brightness') {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const pixels = [];
+  for (let i = 0; i < data.length; i += 4) {
+    pixels.push({
+      r: data[i],
+      g: data[i + 1],
+      b: data[i + 2],
+      a: data[i + 3],
+      index: i
+    });
+  }
+
+  pixels.sort((a, b) => {
+    if (sortMode === 'brightness') {
+      return ((a.r + a.g + a.b) / 3) - ((b.r + b.g + b.b) / 3);
+    }
+    return a.r - b.r;
+  });
+
+  const sortedData = Buffer.from(data);
+  pixels.forEach((pixel, idx) => {
+    const targetIdx = idx * 4;
+    sortedData[targetIdx] = pixel.r;
+    sortedData[targetIdx + 1] = pixel.g;
+    sortedData[targetIdx + 2] = pixel.b;
+    sortedData[targetIdx + 3] = pixel.a;
+  });
+
+  return await sharp(sortedData, {
+    raw: { width: info.width, height: info.height, channels: 4 }
+  }).toBuffer();
+}
+
+async function addNoise(imageBuffer, noiseAmount = 10) {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 0) { // Only add noise to non-transparent pixels
+      const noise = (Math.random() * 2 - 1) * noiseAmount;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    }
+  }
+
+  return await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 }
+  }).toBuffer();
+}
+
 // Usage
 
 export const sprite = {
@@ -571,5 +641,45 @@ export const sprite = {
       return {
         image: `data:image/png;base64,${combined.toString('base64')}`
       };
+    },
+
+    async addOutline(description, outlineOptions = {}, options = {}) {
+        const baseSprite = await this.generatePixelArt(description, options);
+        const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+        
+        const outlined = await generateOutline(imgBuffer, 
+            outlineOptions.color || { r: 0, g: 0, b: 0, alpha: 255 },
+            outlineOptions.thickness || 1
+        );
+        
+        return {
+            original: baseSprite.image,
+            outlined: `data:image/png;base64,${outlined.toString('base64')}`
+        };
+    },
+
+    async createGlitchArt(description, glitchOptions = {}, options = {}) {
+        const baseSprite = await this.generatePixelArt(description, options);
+        const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+        
+        const sorted = await pixelSort(imgBuffer, glitchOptions.sortMode || 'brightness');
+        const noisy = await addNoise(sorted, glitchOptions.noiseAmount || 10);
+        
+        return {
+            original: baseSprite.image,
+            glitched: `data:image/png;base64,${noisy.toString('base64')}`
+        };
+    },
+
+    async generateSpriteVariations(description, variations = 3, options = {}) {
+        const results = await Promise.all(Array(variations).fill().map(async () => {
+            const sprite = await this.generatePixelArt(description, options);
+            return sprite.image;
+        }));
+
+        return {
+            variations: results,
+            count: variations
+        };
     }
 };
