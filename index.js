@@ -541,6 +541,146 @@ async function createPixelationEffect(imageBuffer, pixelationOptions = {}) {
   }).toBuffer();
 }
 
+async function createMosaicEffect(imageBuffer, mosaicOptions = {}) {
+  const {
+    tileSize = 32,          // Size of each tile
+    columns = 3,            // Number of columns in the mosaic
+    rows = 3,               // Number of rows in the mosaic
+    rotation = true,        // Whether to randomly rotate tiles
+    scale = true,          // Whether to randomly scale tiles
+    spacing = 0            // Spacing between tiles
+  } = mosaicOptions;
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const fullWidth = (tileSize * columns) + (spacing * (columns - 1));
+  const fullHeight = (tileSize * rows) + (spacing * (rows - 1));
+
+  // Create base canvas
+  const canvas = {
+    create: {
+      width: fullWidth,
+      height: fullHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  };
+
+  // Prepare tile overlays
+  const overlays = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      let tile = await sharp(imageBuffer)
+        .resize(tileSize, tileSize, { fit: 'contain' });
+
+      // Apply random rotation if enabled
+      if (rotation) {
+        const angle = Math.floor(Math.random() * 4) * 90;
+        tile = tile.rotate(angle);
+      }
+
+      // Apply random scale if enabled
+      if (scale) {
+        const scaleFactor = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+        tile = tile.resize(
+          Math.round(tileSize * scaleFactor),
+          Math.round(tileSize * scaleFactor),
+          { fit: 'contain' }
+        );
+      }
+
+      const tileBuffer = await tile.toBuffer();
+
+      overlays.push({
+        input: tileBuffer,
+        left: col * (tileSize + spacing) + (tileSize - metadata.width) / 2,
+        top: row * (tileSize + spacing) + (tileSize - metadata.height) / 2
+      });
+    }
+  }
+
+  // Combine all tiles
+  return await sharp(canvas)
+    .composite(overlays)
+    .toBuffer();
+}
+
+async function createDissolveEffect(imageBuffer, dissolveOptions = {}) {
+  const {
+    steps = 10,           // Number of dissolution steps
+    pattern = 'random',   // 'random', 'cellular', or 'gradient'
+    direction = 'out',    // 'in' or 'out'
+    seed = Date.now()     // Random seed for reproducible patterns
+  } = dissolveOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const frames = [];
+  const rng = new Math.seedrandom(seed);
+
+  // Create dissolution map
+  const dissolutionMap = new Float32Array(info.width * info.height);
+  switch (pattern) {
+    case 'cellular':
+      // Create cellular noise pattern
+      const points = Array(20).fill().map(() => ({
+        x: Math.floor(rng() * info.width),
+        y: Math.floor(rng() * info.height)
+      }));
+      
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const minDist = Math.min(...points.map(p => 
+            Math.sqrt(Math.pow(x - p.x, 2) + Math.pow(y - p.y, 2))
+          ));
+          dissolutionMap[y * info.width + x] = minDist / Math.sqrt(info.width * info.height);
+        }
+      }
+      break;
+
+    case 'gradient':
+      // Create linear gradient
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          dissolutionMap[y * info.width + x] = y / info.height;
+        }
+      }
+      break;
+
+    default: // random
+      for (let i = 0; i < dissolutionMap.length; i++) {
+        dissolutionMap[i] = rng();
+      }
+  }
+
+  // Generate frames
+  for (let step = 0; step < steps; step++) {
+    const threshold = direction === 'in' ? step / steps : 1 - (step / steps);
+    const frameData = Buffer.alloc(data.length);
+
+    for (let i = 0; i < dissolutionMap.length; i++) {
+      const pixelIndex = i * 4;
+      if (dissolutionMap[i] < threshold) {
+        frameData[pixelIndex] = data[pixelIndex];
+        frameData[pixelIndex + 1] = data[pixelIndex + 1];
+        frameData[pixelIndex + 2] = data[pixelIndex + 2];
+        frameData[pixelIndex + 3] = data[pixelIndex + 3];
+      } else {
+        frameData[pixelIndex + 3] = 0; // Transparent
+      }
+    }
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    frames.push(frame);
+  }
+
+  return frames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1087,6 +1227,38 @@ export const sprite = {
         settings: {
           pixelSize: pixelationOptions.pixelSize || 8,
           mode: pixelationOptions.mode || 'average'
+        }
+      };
+    },
+
+    async addMosaicEffect(description, mosaicOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const mosaic = await createMosaicEffect(imgBuffer, mosaicOptions);
+      
+      return {
+        original: baseSprite.image,
+        mosaic: `data:image/png;base64,${mosaic.toString('base64')}`,
+        settings: {
+          tileSize: mosaicOptions.tileSize || 32,
+          columns: mosaicOptions.columns || 3,
+          rows: mosaicOptions.rows || 3
+        }
+      };
+    },
+
+    async addDissolveEffect(description, dissolveOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const dissolveFrames = await createDissolveEffect(imgBuffer, dissolveOptions);
+      
+      return {
+        original: baseSprite.image,
+        dissolveFrames: dissolveFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          steps: dissolveOptions.steps || 10,
+          pattern: dissolveOptions.pattern || 'random',
+          direction: dissolveOptions.direction || 'out'
         }
       };
     },
