@@ -457,6 +457,90 @@ async function createWaveDistortion(imageBuffer, waveOptions = {}) {
   return frames;
 }
 
+async function createPixelationEffect(imageBuffer, pixelationOptions = {}) {
+  const {
+    pixelSize = 8,
+    preserveAlpha = true,
+    mode = 'average'  // 'average' or 'dominant'
+  } = pixelationOptions;
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  // Calculate new dimensions
+  const blockWidth = Math.max(1, Math.floor(info.width / pixelSize));
+  const blockHeight = Math.max(1, Math.floor(info.height / pixelSize));
+
+  const newData = Buffer.alloc(data.length);
+
+  for (let blockY = 0; blockY < blockHeight; blockY++) {
+    for (let blockX = 0; blockX < blockWidth; blockX++) {
+      const colors = [];
+      const alphas = [];
+
+      // Sample pixels in this block
+      for (let y = blockY * pixelSize; y < Math.min((blockY + 1) * pixelSize, info.height); y++) {
+        for (let x = blockX * pixelSize; x < Math.min((blockX + 1) * pixelSize, info.width); x++) {
+          const idx = (y * info.width + x) * 4;
+          if (data[idx + 3] > 0) { // Only consider non-transparent pixels
+            colors.push({
+              r: data[idx],
+              g: data[idx + 1],
+              b: data[idx + 2]
+            });
+            alphas.push(data[idx + 3]);
+          }
+        }
+      }
+
+      // Calculate block color
+      let blockColor;
+      if (mode === 'dominant' && colors.length > 0) {
+        // Simple mode: use the most frequent color
+        const colorMap = new Map();
+        colors.forEach(c => {
+          const key = `${c.r},${c.g},${c.b}`;
+          colorMap.set(key, (colorMap.get(key) || 0) + 1);
+        });
+        const dominant = Array.from(colorMap.entries())
+          .sort((a, b) => b[1] - a[1])[0][0]
+          .split(',')
+          .map(Number);
+        blockColor = { r: dominant[0], g: dominant[1], b: dominant[2] };
+      } else {
+        // Average mode
+        blockColor = colors.reduce((acc, c) => ({
+          r: acc.r + c.r / colors.length,
+          g: acc.g + c.g / colors.length,
+          b: acc.b + c.b / colors.length
+        }), { r: 0, g: 0, b: 0 });
+      }
+
+      // Calculate block alpha
+      const blockAlpha = preserveAlpha
+        ? alphas.reduce((a, b) => a + b, 0) / alphas.length
+        : Math.max(...alphas);
+
+      // Fill the block with the calculated color
+      for (let y = blockY * pixelSize; y < Math.min((blockY + 1) * pixelSize, info.height); y++) {
+        for (let x = blockX * pixelSize; x < Math.min((blockX + 1) * pixelSize, info.width); x++) {
+          const idx = (y * info.width + x) * 4;
+          newData[idx] = Math.round(blockColor.r);
+          newData[idx + 1] = Math.round(blockColor.g);
+          newData[idx + 2] = Math.round(blockColor.b);
+          newData[idx + 3] = Math.round(blockAlpha || 0);
+        }
+      }
+    }
+  }
+
+  return await sharp(newData, {
+    raw: { width: info.width, height: info.height, channels: 4 }
+  }).toBuffer();
+}
+
 // Usage
 
 export const sprite = {
@@ -990,5 +1074,20 @@ export const sprite = {
         waveFrames: waveFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
         frameCount: waveFrames.length
       };
-    }
+    },
+
+    async addPixelationEffect(description, pixelationOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const pixelated = await createPixelationEffect(imgBuffer, pixelationOptions);
+      
+      return {
+        original: baseSprite.image,
+        pixelated: `data:image/png;base64,${pixelated.toString('base64')}`,
+        settings: {
+          pixelSize: pixelationOptions.pixelSize || 8,
+          mode: pixelationOptions.mode || 'average'
+        }
+      };
+    },
 };
