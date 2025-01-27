@@ -236,6 +236,101 @@ async function addNoise(imageBuffer, noiseAmount = 10) {
   }).toBuffer();
 }
 
+// New utility functions
+async function extractPalette(imageBuffer, maxColors = 16) {
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  
+  const colorMap = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 0) { // Skip transparent pixels
+      const color = `${data[i]},${data[i + 1]},${data[i + 2]}`;
+      colorMap.set(color, (colorMap.get(color) || 0) + 1);
+    }
+  }
+  
+  return Array.from(colorMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxColors)
+    .map(([color]) => color.split(',').map(Number));
+}
+
+async function pixelPerfectScale(imageBuffer, scale = 2) {
+  const metadata = await sharp(imageBuffer).metadata();
+  return await sharp(imageBuffer)
+    .resize(metadata.width * scale, metadata.height * scale, {
+      kernel: 'nearest'
+    })
+    .toBuffer();
+}
+
+async function generateShadow(imageBuffer, shadowOptions = {}) {
+  const { 
+    opacity = 0.5,
+    blur = 3,
+    offsetX = 5,
+    offsetY = 5,
+    color = { r: 0, g: 0, b: 0 }
+  } = shadowOptions;
+
+  const shadow = await sharp(imageBuffer)
+    .negate()
+    .linear(opacity, 0)
+    .blur(blur)
+    .tint(color)
+    .extend({
+      top: Math.max(0, -offsetY),
+      bottom: Math.max(0, offsetY),
+      left: Math.max(0, -offsetX),
+      right: Math.max(0, offsetX),
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    .toBuffer();
+
+  return await sharp(shadow)
+    .composite([{ 
+      input: imageBuffer,
+      top: Math.max(0, offsetY),
+      left: Math.max(0, offsetX)
+    }])
+    .toBuffer();
+}
+
+async function createMirrorEffect(imageBuffer, direction = 'horizontal', fade = true) {
+  const original = await sharp(imageBuffer).toBuffer();
+  const flipped = await sharp(imageBuffer)
+    .flip(direction === 'vertical')
+    .flop(direction === 'horizontal')
+    .toBuffer();
+
+  if (fade) {
+    return await sharp(flipped)
+      .linear(0.5, 0)
+      .composite([{ input: original }])
+      .toBuffer();
+  }
+  return await sharp(original)
+    .composite([{ input: flipped }])
+    .toBuffer();
+}
+
+async function interpolateFrames(frame1Buffer, frame2Buffer, steps = 5) {
+  const frames = [];
+  for (let i = 0; i <= steps; i++) {
+    const opacity = i / steps;
+    const frame = await sharp(frame1Buffer)
+      .composite([{
+        input: frame2Buffer,
+        blend: 'over',
+        linear: opacity
+      }])
+      .toBuffer();
+    frames.push(frame);
+  }
+  return frames;
+}
+
 // Usage
 
 export const sprite = {
@@ -681,5 +776,70 @@ export const sprite = {
             variations: results,
             count: variations
         };
+    },
+
+    async optimizePalette(description, maxColors = 16, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const palette = await extractPalette(imgBuffer, maxColors);
+      
+      return {
+        original: baseSprite.image,
+        palette,
+        paletteSize: palette.length
+      };
+    },
+
+    async createPixelPerfect(description, scale = 2, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const scaled = await pixelPerfectScale(imgBuffer, scale);
+      
+      return {
+        original: baseSprite.image,
+        scaled: `data:image/png;base64,${scaled.toString('base64')}`
+      };
+    },
+
+    async addShadow(description, shadowOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const withShadow = await generateShadow(imgBuffer, shadowOptions);
+      
+      return {
+        original: baseSprite.image,
+        withShadow: `data:image/png;base64,${withShadow.toString('base64')}`
+      };
+    },
+
+    async createMirrorSprite(description, direction = 'horizontal', options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const mirrored = await createMirrorEffect(imgBuffer, direction, options.fade);
+      
+      return {
+        original: baseSprite.image,
+        mirrored: `data:image/png;base64,${mirrored.toString('base64')}`
+      };
+    },
+
+    async createSpriteAnimation(description, frameCount = 2, options = {}) {
+      const frames = await Promise.all(
+        Array(frameCount).fill().map(() => this.generatePixelArt(description, options))
+      );
+      
+      const interpolatedFrames = [];
+      for (let i = 0; i < frames.length - 1; i++) {
+        const buffer1 = Buffer.from(frames[i].image.split(',')[1], 'base64');
+        const buffer2 = Buffer.from(frames[i + 1].image.split(',')[1], 'base64');
+        const tweens = await interpolateFrames(buffer1, buffer2, options.steps || 3);
+        interpolatedFrames.push(...tweens.map(f => `data:image/png;base64,${f.toString('base64')}`));
+      }
+      
+      return {
+        originalFrames: frames.map(f => f.image),
+        interpolatedFrames,
+        totalFrames: interpolatedFrames.length
+      };
     }
 };
