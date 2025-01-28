@@ -1559,7 +1559,7 @@ export const sprite = {
           pattern: shatterOptions.pattern || 'radial'
         }
       };
-    }, //lol
+    }, //lol yeah
 
     async addKaleidoscopeEffect(description, kaleidoscopeOptions = {}, options = {}) {
       const baseSprite = await this.generatePixelArt(description, options);
