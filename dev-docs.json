@@ -19,7 +19,7 @@
   },
   "gitHubApp": {
     "connectedOrg": "spriteai",
-    "userDocsWorkflows": ["generateUserDocs"],
+    "userDocsWorkflows": ["generateDocsIssue"],
     "issues": true
   }
 }

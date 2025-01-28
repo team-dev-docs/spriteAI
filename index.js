@@ -884,6 +884,67 @@ async function createShatterEffect(imageBuffer, shatterOptions = {}) {
   return animationFrames;
 }
 
+async function createKaleidoscopeEffect(imageBuffer, kaleidoscopeOptions = {}) {
+  const {
+    segments = 8,           // Number of repeated segments
+    rotation = 0,          // Base rotation angle
+    zoom = 1.0,           // Zoom factor
+    centerX = 0.5,        // Center point X (0-1)
+    centerY = 0.5,        // Center point Y (0-1)
+    frames = 1            // Number of animation frames
+  } = kaleidoscopeOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const animationFrames = [];
+  const angleStep = (Math.PI * 2) / segments;
+  
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.alloc(data.length);
+    const frameRotation = rotation + (frame * Math.PI * 2 / frames);
+    
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        // Convert to polar coordinates relative to center
+        const dx = (x / info.width - centerX) / zoom;
+        const dy = (y / info.height - centerY) / zoom;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        let theta = Math.atan2(dy, dx) - frameRotation;
+        
+        // Wrap angle to segment
+        theta = (theta % angleStep + angleStep) % angleStep;
+        if (theta > angleStep / 2) {
+          theta = angleStep - theta; // Mirror within segment
+        }
+        
+        // Convert back to cartesian coordinates
+        const sourceX = Math.round((r * Math.cos(theta + frameRotation) * zoom + centerX) * info.width);
+        const sourceY = Math.round((r * Math.sin(theta + frameRotation) * zoom + centerY) * info.height);
+        
+        // Copy pixel if within bounds
+        if (sourceX >= 0 && sourceX < info.width && sourceY >= 0 && sourceY < info.height) {
+          const sourceIdx = (sourceY * info.width + sourceX) * 4;
+          const targetIdx = (y * info.width + x) * 4;
+          frameData[targetIdx] = data[sourceIdx];
+          frameData[targetIdx + 1] = data[sourceIdx + 1];
+          frameData[targetIdx + 2] = data[sourceIdx + 2];
+          frameData[targetIdx + 3] = data[sourceIdx + 3];
+        }
+      }
+    }
+    
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+    
+    animationFrames.push(frame);
+  }
+  
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1496,6 +1557,23 @@ export const sprite = {
           spread: shatterOptions.spread || 100,
           frames: shatterOptions.frames || 15,
           pattern: shatterOptions.pattern || 'radial'
+        }
+      };
+    },
+
+    async addKaleidoscopeEffect(description, kaleidoscopeOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const kaleidoscopeFrames = await createKaleidoscopeEffect(imgBuffer, kaleidoscopeOptions);
+      
+      return {
+        original: baseSprite.image,
+        kaleidoscopeFrames: kaleidoscopeFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          segments: kaleidoscopeOptions.segments || 8,
+          rotation: kaleidoscopeOptions.rotation || 0,
+          zoom: kaleidoscopeOptions.zoom || 1.0,
+          frames: kaleidoscopeOptions.frames || 1
         }
       };
     },
