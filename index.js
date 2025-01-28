@@ -745,6 +745,145 @@ async function createSplashEffect(imageBuffer, splashOptions = {}) {
   return animationFrames;
 }
 
+async function createShatterEffect(imageBuffer, shatterOptions = {}) {
+  const {
+    pieces = 12,           // Number of shatter pieces
+    spread = 100,          // How far pieces spread
+    rotation = true,       // Whether pieces should rotate
+    gravity = 0.5,        // Gravity effect on pieces
+    frames = 15,          // Number of animation frames
+    pattern = 'radial'    // 'radial' or 'grid'
+  } = shatterOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const centerX = info.width / 2;
+  const centerY = info.height / 2;
+  const animationFrames = [];
+
+  // Generate shatter pieces
+  const shatterPieces = [];
+  if (pattern === 'grid') {
+    const cols = Math.floor(Math.sqrt(pieces));
+    const rows = Math.ceil(pieces / cols);
+    const pieceWidth = Math.floor(info.width / cols);
+    const pieceHeight = Math.floor(info.height / rows);
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (shatterPieces.length < pieces) {
+          const piece = {
+            x: x * pieceWidth,
+            y: y * pieceHeight,
+            width: pieceWidth,
+            height: pieceHeight,
+            rotation: rotation ? Math.random() * 360 : 0,
+            velocityX: (Math.random() - 0.5) * spread,
+            velocityY: (Math.random() - 0.5) * spread,
+            data: Buffer.alloc(pieceWidth * pieceHeight * 4)
+          };
+          
+          // Copy piece data
+          for (let py = 0; py < pieceHeight; py++) {
+            for (let px = 0; px < pieceWidth; px++) {
+              const sourceIdx = ((y * pieceHeight + py) * info.width + (x * pieceWidth + px)) * 4;
+              const targetIdx = (py * pieceWidth + px) * 4;
+              piece.data[targetIdx] = data[sourceIdx];
+              piece.data[targetIdx + 1] = data[sourceIdx + 1];
+              piece.data[targetIdx + 2] = data[sourceIdx + 2];
+              piece.data[targetIdx + 3] = data[sourceIdx + 3];
+            }
+          }
+          shatterPieces.push(piece);
+        }
+      }
+    }
+  } else { // radial
+    const angleStep = (Math.PI * 2) / pieces;
+    const radius = Math.min(info.width, info.height) / 4;
+    
+    for (let i = 0; i < pieces; i++) {
+      const angle = angleStep * i;
+      const pieceWidth = Math.floor(info.width / Math.sqrt(pieces));
+      const pieceHeight = Math.floor(info.height / Math.sqrt(pieces));
+      const centerPieceX = centerX + Math.cos(angle) * radius;
+      const centerPieceY = centerY + Math.sin(angle) * radius;
+      
+      const piece = {
+        x: Math.floor(centerPieceX - pieceWidth / 2),
+        y: Math.floor(centerPieceY - pieceHeight / 2),
+        width: pieceWidth,
+        height: pieceHeight,
+        rotation: rotation ? Math.random() * 360 : 0,
+        velocityX: Math.cos(angle) * spread,
+        velocityY: Math.sin(angle) * spread,
+        data: Buffer.alloc(pieceWidth * pieceHeight * 4)
+      };
+      
+      // Copy piece data
+      for (let y = 0; y < pieceHeight; y++) {
+        for (let x = 0; x < pieceWidth; x++) {
+          const sourceX = Math.min(Math.max(Math.floor(piece.x + x), 0), info.width - 1);
+          const sourceY = Math.min(Math.max(Math.floor(piece.y + y), 0), info.height - 1);
+          const sourceIdx = (sourceY * info.width + sourceX) * 4;
+          const targetIdx = (y * pieceWidth + x) * 4;
+          piece.data[targetIdx] = data[sourceIdx];
+          piece.data[targetIdx + 1] = data[sourceIdx + 1];
+          piece.data[targetIdx + 2] = data[sourceIdx + 2];
+          piece.data[targetIdx + 3] = data[sourceIdx + 3];
+        }
+      }
+      shatterPieces.push(piece);
+    }
+  }
+
+  // Generate animation frames
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.alloc(data.length);
+    const progress = frame / frames;
+    
+    // Update and draw pieces
+    shatterPieces.forEach(piece => {
+      // Update position
+      piece.x += piece.velocityX * progress;
+      piece.y += piece.velocityY * progress + (gravity * progress * progress * 50);
+      piece.rotation += rotation ? 5 : 0;
+      
+      // Draw piece
+      const transform = sharp(piece.data, {
+        raw: { width: piece.width, height: piece.height, channels: 4 }
+      })
+        .rotate(piece.rotation)
+        .resize(piece.width, piece.height, { fit: 'contain' });
+      
+      // Composite piece onto frame
+      const pieceBuffer = transform.toBuffer();
+      const composite = [{
+        input: pieceBuffer,
+        top: Math.round(piece.y),
+        left: Math.round(piece.x)
+      }];
+      
+      sharp(frameData, { raw: { width: info.width, height: info.height, channels: 4 } })
+        .composite(composite)
+        .toBuffer()
+        .then(composited => {
+          frameData.set(composited);
+        });
+    });
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    animationFrames.push(frame);
+  }
+
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1340,6 +1479,23 @@ export const sprite = {
           rippleCount: splashOptions.rippleCount || 3,
           frames: splashOptions.frames || 10,
           speed: splashOptions.speed || 1
+        }
+      };
+    },
+
+    async addShatterEffect(description, shatterOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const shatterFrames = await createShatterEffect(imgBuffer, shatterOptions);
+      
+      return {
+        original: baseSprite.image,
+        shatterFrames: shatterFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          pieces: shatterOptions.pieces || 12,
+          spread: shatterOptions.spread || 100,
+          frames: shatterOptions.frames || 15,
+          pattern: shatterOptions.pattern || 'radial'
         }
       };
     },
