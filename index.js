@@ -681,6 +681,70 @@ async function createDissolveEffect(imageBuffer, dissolveOptions = {}) {
   return frames;
 }
 
+async function createSplashEffect(imageBuffer, splashOptions = {}) {
+  const {
+    intensity = 30,        // Intensity of the splash distortion
+    rippleCount = 3,       // Number of ripple rings
+    frames = 10,           // Number of animation frames
+    speed = 1,            // Speed of ripple expansion
+    center = null         // Custom center point, or null for center
+  } = splashOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const centerX = center?.x || Math.floor(info.width / 2);
+  const centerY = center?.y || Math.floor(info.height / 2);
+  const animationFrames = [];
+
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.alloc(data.length);
+    const time = frame / frames;
+
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Calculate ripple displacement
+        let offset = 0;
+        for (let i = 0; i < rippleCount; i++) {
+          const ripplePhase = (distance / 50 - time * speed) * Math.PI * 2;
+          offset += Math.sin(ripplePhase + i * Math.PI / rippleCount) 
+                   * intensity 
+                   * Math.exp(-distance / (info.width / 2))
+                   * (1 - time);
+        }
+
+        // Calculate source pixel position with ripple effect
+        const angle = Math.atan2(dy, dx);
+        const sourceX = Math.round(x + Math.cos(angle) * offset);
+        const sourceY = Math.round(y + Math.sin(angle) * offset);
+
+        // Copy pixel if within bounds
+        if (sourceX >= 0 && sourceX < info.width && sourceY >= 0 && sourceY < info.height) {
+          const sourceIdx = (sourceY * info.width + sourceX) * 4;
+          const targetIdx = (y * info.width + x) * 4;
+          frameData[targetIdx] = data[sourceIdx];
+          frameData[targetIdx + 1] = data[sourceIdx + 1];
+          frameData[targetIdx + 2] = data[sourceIdx + 2];
+          frameData[targetIdx + 3] = data[sourceIdx + 3];
+        }
+      }
+    }
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    animationFrames.push(frame);
+  }
+
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1259,6 +1323,23 @@ export const sprite = {
           steps: dissolveOptions.steps || 10,
           pattern: dissolveOptions.pattern || 'random',
           direction: dissolveOptions.direction || 'out'
+        }
+      };
+    },
+
+    async addSplashEffect(description, splashOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const splashFrames = await createSplashEffect(imgBuffer, splashOptions);
+      
+      return {
+        original: baseSprite.image,
+        splashFrames: splashFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          intensity: splashOptions.intensity || 30,
+          rippleCount: splashOptions.rippleCount || 3,
+          frames: splashOptions.frames || 10,
+          speed: splashOptions.speed || 1
         }
       };
     },
