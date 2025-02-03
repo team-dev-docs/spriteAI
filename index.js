@@ -1020,6 +1020,80 @@ async function createGlitchWaveEffect(imageBuffer, options = {}) {
   return animationFrames;
 }
 
+async function createDisplacementEffect(imageBuffer, displacementOptions = {}) {
+  const {
+    intensity = 15,
+    displacementMap = 'noise', // 'noise', 'waves', or 'custom'
+    frames = 1,
+    frequency = 0.05,
+    customMap = null
+  } = displacementOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const animationFrames = [];
+
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.alloc(data.length);
+    const progress = frame / frames;
+
+    // Generate displacement map
+    const displacementData = new Float32Array(info.width * info.height * 2);
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x) * 2;
+        
+        switch (displacementMap) {
+          case 'waves':
+            displacementData[i] = Math.sin(x * frequency + progress * Math.PI * 2) * intensity;
+            displacementData[i + 1] = Math.cos(y * frequency + progress * Math.PI * 2) * intensity;
+            break;
+          case 'custom':
+            if (customMap && customMap.length >= info.width * info.height * 2) {
+              displacementData[i] = customMap[i] * intensity;
+              displacementData[i + 1] = customMap[i + 1] * intensity;
+            }
+            break;
+          default: // noise
+            displacementData[i] = (Math.random() * 2 - 1) * intensity;
+            displacementData[i + 1] = (Math.random() * 2 - 1) * intensity;
+        }
+      }
+    }
+
+    // Apply displacement
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x);
+        const dispIndex = i * 2;
+        
+        const sourceX = Math.round(x + displacementData[dispIndex]);
+        const sourceY = Math.round(y + displacementData[dispIndex + 1]);
+        
+        if (sourceX >= 0 && sourceX < info.width && sourceY >= 0 && sourceY < info.height) {
+          const targetIdx = i * 4;
+          const sourceIdx = (sourceY * info.width + sourceX) * 4;
+          
+          frameData[targetIdx] = data[sourceIdx];
+          frameData[targetIdx + 1] = data[sourceIdx + 1];
+          frameData[targetIdx + 2] = data[sourceIdx + 2];
+          frameData[targetIdx + 3] = data[sourceIdx + 3];
+        }
+      }
+    }
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    animationFrames.push(frame);
+  }
+
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1667,6 +1741,23 @@ export const sprite = {
           scanlines: glitchWaveOptions.scanlines || true,
           frames: glitchWaveOptions.frames || 8,
           chromaShift: glitchWaveOptions.chromaShift || 2
+        }
+      };
+    },
+
+    async addDisplacementEffect(description, displacementOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const displacementFrames = await createDisplacementEffect(imgBuffer, displacementOptions);
+      
+      return {
+        original: baseSprite.image,
+        displacementFrames: displacementFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          intensity: displacementOptions.intensity || 15,
+          displacementMap: displacementOptions.displacementMap || 'noise',
+          frames: displacementOptions.frames || 1,
+          frequency: displacementOptions.frequency || 0.05
         }
       };
     },
