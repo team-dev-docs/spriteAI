@@ -40,7 +40,7 @@ function encodeImage(imagePath) {
 
 
 async function getUniqueColors(imagePath, options = {}) {
-  //addd some things test test test test test test booooo
+  //addd some things test test test test test booooo
     const image = await Jimp.read(imagePath);
     const colorSet = new Set();
     //adds more stuff dude lol
@@ -1094,6 +1094,146 @@ async function createDisplacementEffect(imageBuffer, displacementOptions = {}) {
   return animationFrames;
 }
 
+async function createWeatherEffect(imageBuffer, weatherOptions = {}) {
+  const {
+    type = 'rain',           // rain, snow, fog, storm, sandstorm
+    intensity = 0.5,         // 0-1: particle density
+    frames = 10,            // Number of animation frames
+    speed = 1.0,            // Animation speed multiplier
+    tint = null,            // Optional color tint for the weather
+    particleSize = 2        // Size of weather particles
+  } = weatherOptions;
+
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const animationFrames = [];
+  const particleCount = Math.floor((info.width * info.height) * intensity * 0.01);
+
+  // Generate particle positions for each frame
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.from(data);
+    const progress = frame / frames;
+
+    // Generate particles based on weather type
+    for (let i = 0; i < particleCount; i++) {
+      let x, y, alpha, color;
+
+      switch (type) {
+        case 'rain':
+          x = Math.random() * info.width;
+          y = (Math.random() * info.height + progress * speed * info.height) % info.height;
+          alpha = 180;
+          color = tint || { r: 200, g: 200, b: 255 };
+          // Draw rain drop
+          for (let j = 0; j < particleSize * 2; j++) {
+            const dropY = Math.floor(y - j);
+            if (dropY >= 0 && dropY < info.height) {
+              const idx = (dropY * info.width + Math.floor(x)) * 4;
+              frameData[idx] = color.r;
+              frameData[idx + 1] = color.g;
+              frameData[idx + 2] = color.b;
+              frameData[idx + 3] = alpha * (1 - j / (particleSize * 2));
+            }
+          }
+          break;
+
+        case 'snow':
+          x = (Math.random() * info.width + Math.sin(progress * Math.PI * 2) * 5) % info.width;
+          y = (Math.random() * info.height + progress * speed * info.height * 0.5) % info.height;
+          alpha = 200;
+          color = tint || { r: 255, g: 255, b: 255 };
+          // Draw snowflake
+          for (let dy = 0; dy < particleSize; dy++) {
+            for (let dx = 0; dx < particleSize; dx++) {
+              const px = Math.floor(x + dx - particleSize/2);
+              const py = Math.floor(y + dy - particleSize/2);
+              if (px >= 0 && px < info.width && py >= 0 && py < info.height) {
+                const idx = (py * info.width + px) * 4;
+                frameData[idx] = color.r;
+                frameData[idx + 1] = color.g;
+                frameData[idx + 2] = color.b;
+                frameData[idx + 3] = alpha * (1 - (dx*dx + dy*dy)/(particleSize*particleSize));
+              }
+            }
+          }
+          break;
+
+        case 'fog':
+          const fogY = Math.floor(Math.random() * info.height);
+          alpha = 5;
+          color = tint || { r: 255, g: 255, b: 255 };
+          // Draw horizontal fog line
+          for (let fogX = 0; fogX < info.width; fogX++) {
+            const idx = (fogY * info.width + fogX) * 4;
+            frameData[idx] = Math.min(255, frameData[idx] + color.r);
+            frameData[idx + 1] = Math.min(255, frameData[idx + 1] + color.g);
+            frameData[idx + 2] = Math.min(255, frameData[idx + 2] + color.b);
+            frameData[idx + 3] = Math.min(255, frameData[idx + 3] + alpha);
+          }
+          break;
+
+        case 'storm':
+          if (Math.random() < 0.1) { // Lightning flash
+            const flashIntensity = Math.random() * 50;
+            for (let i = 0; i < data.length; i += 4) {
+              frameData[i] = Math.min(255, frameData[i] + flashIntensity);
+              frameData[i + 1] = Math.min(255, frameData[i + 1] + flashIntensity);
+              frameData[i + 2] = Math.min(255, frameData[i + 2] + flashIntensity);
+            }
+          }
+          // Add rain effect
+          x = Math.random() * info.width;
+          y = (Math.random() * info.height + progress * speed * info.height * 1.5) % info.height;
+          alpha = 180;
+          color = tint || { r: 200, g: 200, b: 255 };
+          // Draw rain drop
+          for (let j = 0; j < particleSize * 3; j++) {
+            const dropY = Math.floor(y - j);
+            if (dropY >= 0 && dropY < info.height) {
+              const idx = (dropY * info.width + Math.floor(x)) * 4;
+              frameData[idx] = color.r;
+              frameData[idx + 1] = color.g;
+              frameData[idx + 2] = color.b;
+              frameData[idx + 3] = alpha * (1 - j / (particleSize * 3));
+            }
+          }
+          break;
+
+        case 'sandstorm':
+          x = (Math.random() * info.width + progress * speed * info.width) % info.width;
+          y = Math.random() * info.height;
+          alpha = 100;
+          color = tint || { r: 210, g: 180, b: 140 };
+          // Draw sand particle
+          for (let dy = 0; dy < particleSize; dy++) {
+            for (let dx = 0; dx < particleSize * 2; dx++) {
+              const px = Math.floor(x + dx);
+              const py = Math.floor(y + dy - particleSize/2);
+              if (px >= 0 && px < info.width && py >= 0 && py < info.height) {
+                const idx = (py * info.width + px) * 4;
+                frameData[idx] = Math.min(255, frameData[idx] + color.r);
+                frameData[idx + 1] = Math.min(255, frameData[idx + 1] + color.g);
+                frameData[idx + 2] = Math.min(255, frameData[idx + 2] + color.b);
+                frameData[idx + 3] = Math.min(255, frameData[idx + 3] + alpha);
+              }
+            }
+          }
+          break;
+      }
+    }
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    animationFrames.push(frame);
+  }
+
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1945,4 +2085,122 @@ export const sprite = {
 
       return result;
     },
+
+    async createLightingVariation(description, lightingOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+
+      const {
+        lightColor = { r: 255, g: 255, b: 200 },  // Warm light by default
+        intensity = 0.8,                          // Light strength
+        direction = 'top-left',                   // Light source direction
+        ambient = 0.2,                            // Ambient light level
+        shadows = true,                           // Enable dynamic shadows
+        colorize = false                          // Colorize the light
+      } = lightingOptions;
+
+      // Calculate directional vector based on light direction
+      const directionVectors = {
+        'top': [0, -1],
+        'top-right': [1, -1],
+        'right': [1, 0],
+        'bottom-right': [1, 1],
+        'bottom': [0, 1],
+        'bottom-left': [-1, 1],
+        'left': [-1, 0],
+        'top-left': [-1, -1]
+      };
+      const [dirX, dirY] = directionVectors[direction] || [-1, -1];
+
+      // Process the image data
+      const { data, info } = await sharp(imgBuffer)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const newData = Buffer.alloc(data.length);
+
+      // Apply lighting effects
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const idx = (y * info.width + x) * 4;
+          
+          // Skip fully transparent pixels
+          if (data[idx + 3] === 0) {
+            continue;
+          }
+
+          // Calculate lighting factor based on position and direction
+          const distanceFromEdge = Math.abs((x * dirX + y * dirY) / Math.sqrt(info.width * info.width + info.height * info.height));
+          let lightFactor = 1 - (distanceFromEdge * (1 - ambient)) * intensity;
+          
+          // Add some variation based on pixel position
+          lightFactor *= 0.9 + Math.random() * 0.2;
+          
+          // Apply shadows if enabled
+          if (shadows) {
+            // Simple shadow mapping based on neighbors
+            const hasNeighbor = (x + dirX >= 0 && x + dirX < info.width && 
+                                y + dirY >= 0 && y + dirY < info.height) &&
+                               data[((y + dirY) * info.width + (x + dirX)) * 4 + 3] > 0;
+            if (!hasNeighbor) {
+              lightFactor *= 0.7; // Darken edges without neighbors
+            }
+          }
+
+          // Apply lighting
+          if (colorize) {
+            // Colorize the light
+            newData[idx] = Math.min(255, Math.round(data[idx] * lightFactor * (lightColor.r / 255)));
+            newData[idx + 1] = Math.min(255, Math.round(data[idx + 1] * lightFactor * (lightColor.g / 255)));
+            newData[idx + 2] = Math.min(255, Math.round(data[idx + 2] * lightFactor * (lightColor.b / 255)));
+          } else {
+            // Standard lighting
+            newData[idx] = Math.min(255, Math.round(data[idx] * lightFactor));
+            newData[idx + 1] = Math.min(255, Math.round(data[idx + 1] * lightFactor));
+            newData[idx + 2] = Math.min(255, Math.round(data[idx + 2] * lightFactor));
+          }
+          newData[idx + 3] = data[idx + 3]; // Preserve original alpha
+        }
+      }
+
+      const processedBuffer = await sharp(newData, {
+        raw: {
+          width: info.width,
+          height: info.height,
+          channels: 4
+        }
+      }).toBuffer();
+
+      return {
+        original: baseSprite.image,
+        lighted: `data:image/png;base64,${processedBuffer.toString('base64')}`,
+        settings: {
+          lightColor,
+          intensity,
+          direction,
+          ambient,
+          shadows,
+          colorize
+        }
+      };
+    },
+
+    async addWeatherEffect(description, weatherOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const weatherFrames = await createWeatherEffect(imgBuffer, weatherOptions);
+      
+      return {
+        original: baseSprite.image,
+        weatherFrames: weatherFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          type: weatherOptions.type || 'rain',
+          intensity: weatherOptions.intensity || 0.5,
+          frames: weatherOptions.frames || 10,
+          speed: weatherOptions.speed || 1.0
+        }
+      };
+    },
 };
+
+sprite.addWeatherEffect = addWeatherEffect;
