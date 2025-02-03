@@ -1761,4 +1761,188 @@ export const sprite = {
         }
       };
     },
+
+    async createMechaSpriteVariation(description, mechaOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      
+      // Process metadata for mechanical parts
+      const metadata = await sharp(imgBuffer).metadata();
+      
+      // Default mecha transformation options
+      const {
+        armorLevel = 0.5,         // 0-1: Amount of mechanical armor coverage
+        glowEffects = true,       // Add energy/tech glow effects
+        colorScheme = 'chrome',    // chrome, neon, industrial
+        appendages = 2,           // Number of additional mechanical parts
+        techLevel = 'advanced'    // basic, advanced, or futuristic
+      } = mechaOptions;
+
+      // Create base mechanical transformation
+      let mechaSprite = await sharp(imgBuffer)
+        .negate({ alpha: false })  // Invert colors for metallic look
+        .modulate({
+          brightness: 1.2,
+          saturation: colorScheme === 'neon' ? 1.5 : 0.8
+        });
+
+      // Add metallic effects based on color scheme
+      switch (colorScheme) {
+        case 'chrome':
+          mechaSprite = mechaSprite.tint({ r: 220, g: 220, b: 230 });
+          break;
+        case 'neon':
+          mechaSprite = mechaSprite.tint({ r: 0, g: 255, b: 255 });
+          break;
+        case 'industrial':
+          mechaSprite = mechaSprite.tint({ r: 180, g: 170, b: 160 });
+          break;
+      }
+
+      // Add glow effects if enabled
+      if (glowEffects) {
+        const glowColor = colorScheme === 'neon' 
+          ? { r: 0, g: 255, b: 255, alpha: 0.5 }
+          : { r: 255, g: 200, b: 0, alpha: 0.5 };
+        
+        mechaSprite = mechaSprite.composite([{
+          input: await generateOutline(imgBuffer, glowColor, 2),
+          blend: 'over'
+        }]);
+      }
+
+      // Add mechanical details based on tech level
+      const detailIntensity = {
+        basic: 0.3,
+        advanced: 0.6,
+        futuristic: 0.9
+      }[techLevel] || 0.5;
+
+      // Apply final processing
+      const finalSprite = await mechaSprite
+        .sharpen(detailIntensity * 10)
+        .gamma(1.1)
+        .toBuffer();
+
+      return {
+        original: baseSprite.image,
+        mechaVariation: `data:image/png;base64,${finalSprite.toString('base64')}`,
+        settings: {
+          armorLevel,
+          glowEffects,
+          colorScheme,
+          appendages,
+          techLevel
+        }
+      };
+    },
+
+    async createElementalVariation(description, elementType = 'fire', options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      
+      // Define elemental effects
+      const elementEffects = {
+        fire: {
+          tint: { r: 255, g: 100, b: 0 },
+          glow: { r: 255, g: 50, b: 0, alpha: 0.6 },
+          particleCount: 15,
+          waveOptions: { intensity: 10, frequency: 0.1, animationFrames: 8 }
+        },
+        water: {
+          tint: { r: 0, g: 150, b: 255 },
+          glow: { r: 0, g: 200, b: 255, alpha: 0.5 },
+          particleCount: 20,
+          waveOptions: { intensity: 15, frequency: 0.05, animationFrames: 10 }
+        },
+        earth: {
+          tint: { r: 139, g: 69, b: 19 },
+          glow: { r: 101, g: 67, b: 33, alpha: 0.4 },
+          particleCount: 8,
+          displacement: { intensity: 5, pattern: 'cellular' }
+        },
+        air: {
+          tint: { r: 200, g: 200, b: 255 },
+          glow: { r: 255, g: 255, b: 255, alpha: 0.3 },
+          particleCount: 25,
+          blurAmount: 1.2
+        },
+        lightning: {
+          tint: { r: 255, g: 255, b: 100 },
+          glow: { r: 255, g: 255, b: 0, alpha: 0.7 },
+          glitchOptions: { intensity: 30, glitchAmount: 0.5, frames: 5 }
+        },
+        ice: {
+          tint: { r: 200, g: 255, b: 255 },
+          glow: { r: 150, g: 240, b: 255, alpha: 0.4 },
+          crystallize: true,
+          shatterOptions: { pieces: 10, spread: 20 }
+        }
+      };
+
+      const effect = elementEffects[elementType.toLowerCase()] || elementEffects.fire;
+      
+      // Apply base elemental tint
+      let elementalSprite = await sharp(imgBuffer)
+        .tint(effect.tint)
+        .toBuffer();
+
+      // Add element-specific effects
+      if (elementType === 'fire' || elementType === 'water') {
+        const waveFrames = await createWaveDistortion(elementalSprite, effect.waveOptions);
+        const particles = await createParticleEffect(elementalSprite, effect.particleCount);
+        
+        // Combine wave effect with particles
+        elementalSprite = await Promise.all(waveFrames.map(async (frame) => {
+          const withParticles = await sharp(frame)
+            .composite(particles.map(p => ({ input: p, blend: 'over' })))
+            .toBuffer();
+          return withParticles;
+        }));
+      } else if (elementType === 'earth') {
+        elementalSprite = await createDisplacementEffect(elementalSprite, effect.displacement);
+      } else if (elementType === 'air') {
+        elementalSprite = await sharp(elementalSprite)
+          .blur(effect.blurAmount)
+          .toBuffer();
+      } else if (elementType === 'lightning') {
+        elementalSprite = await createGlitchWaveEffect(elementalSprite, effect.glitchOptions);
+      } else if (elementType === 'ice') {
+        if (effect.crystallize) {
+          elementalSprite = await createPixelationEffect(elementalSprite, { pixelSize: 4 });
+        }
+        if (effect.shatterOptions) {
+          elementalSprite = await createShatterEffect(elementalSprite, effect.shatterOptions);
+        }
+      }
+
+      // Add glow effect
+      const withGlow = await generateOutline(
+        Array.isArray(elementalSprite) ? elementalSprite[0] : elementalSprite,
+        effect.glow,
+        2
+      );
+
+      // Prepare result
+      const result = {
+        original: baseSprite.image,
+        settings: {
+          elementType,
+          ...effect
+        }
+      };
+
+      // Handle animated vs static results
+      if (Array.isArray(elementalSprite)) {
+        result.elementalFrames = elementalSprite.map(frame => 
+          `data:image/png;base64,${frame.toString('base64')}`
+        );
+        result.withGlow = `data:image/png;base64,${withGlow.toString('base64')}`;
+      } else {
+        result.elemental = `data:image/png;base64,${elementalSprite.toString('base64')}`;
+        result.withGlow = `data:image/png;base64,${withGlow.toString('base64')}`;
+      }
+
+      return result;
+    },
 };
