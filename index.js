@@ -945,6 +945,81 @@ async function createKaleidoscopeEffect(imageBuffer, kaleidoscopeOptions = {}) {
   return animationFrames;
 }
 
+async function createGlitchWaveEffect(imageBuffer, options = {}) {
+  const {
+    intensity = 20,         // Intensity of the wave distortion
+    glitchAmount = 0.3,    // Amount of glitch effect (0-1)
+    scanlines = true,      // Add scanline effect
+    frames = 8,            // Number of animation frames
+    chromaShift = 2        // RGB channel shift amount
+  } = options;
+
+  const animationFrames = [];
+  const { data, info } = await sharp(imageBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  for (let frame = 0; frame < frames; frame++) {
+    const frameData = Buffer.alloc(data.length);
+    const progress = frame / frames;
+    const wavePhase = progress * Math.PI * 2;
+
+    // Create RGB channel copies for chromatic aberration
+    const channels = {
+      r: Buffer.from(data),
+      g: Buffer.from(data),
+      b: Buffer.from(data)
+    };
+
+    for (let y = 0; y < info.height; y++) {
+      // Calculate wave displacement
+      const waveOffset = Math.sin(y * 0.1 + wavePhase) * intensity;
+      
+      // Random glitch offset for this scanline
+      const glitchOffset = Math.random() < glitchAmount ? 
+        Math.floor(Math.random() * intensity * 2) : 0;
+
+      for (let x = 0; x < info.width; x++) {
+        const targetIdx = (y * info.width + x) * 4;
+        
+        // Apply different offsets to each color channel
+        const sourceX = {
+          r: Math.floor(x + waveOffset + glitchOffset),
+          g: Math.floor(x + waveOffset + glitchOffset + chromaShift),
+          b: Math.floor(x + waveOffset + glitchOffset - chromaShift)
+        };
+
+        // Copy color channels with shifts
+        for (const [channel, offset] of Object.entries(sourceX)) {
+          const idx = (y * info.width + offset) * 4;
+          const channelIdx = channel === 'r' ? 0 : channel === 'g' ? 1 : 2;
+          frameData[targetIdx + channelIdx] = 
+            offset >= 0 && offset < info.width ? 
+              channels[channel][idx + channelIdx] : 0;
+        }
+
+        // Set alpha channel
+        frameData[targetIdx + 3] = data[targetIdx + 3];
+
+        // Add scanlines effect
+        if (scanlines && y % 2 === 0) {
+          frameData[targetIdx] *= 0.7;
+          frameData[targetIdx + 1] *= 0.7;
+          frameData[targetIdx + 2] *= 0.7;
+        }
+      }
+    }
+
+    const frame = await sharp(frameData, {
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).toBuffer();
+
+    animationFrames.push(frame);
+  }
+
+  return animationFrames;
+}
+
 // Usage
 
 export const sprite = {
@@ -1574,6 +1649,24 @@ export const sprite = {
           rotation: kaleidoscopeOptions.rotation || 0,
           zoom: kaleidoscopeOptions.zoom || 1.0,
           frames: kaleidoscopeOptions.frames || 1
+        }
+      };
+    },
+
+    async addGlitchWaveEffect(description, glitchWaveOptions = {}, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      const glitchWaveFrames = await createGlitchWaveEffect(imgBuffer, glitchWaveOptions);
+      
+      return {
+        original: baseSprite.image,
+        glitchWaveFrames: glitchWaveFrames.map(f => `data:image/png;base64,${f.toString('base64')}`),
+        settings: {
+          intensity: glitchWaveOptions.intensity || 20,
+          glitchAmount: glitchWaveOptions.glitchAmount || 0.3,
+          scanlines: glitchWaveOptions.scanlines || true,
+          frames: glitchWaveOptions.frames || 8,
+          chromaShift: glitchWaveOptions.chromaShift || 2
         }
       };
     },
