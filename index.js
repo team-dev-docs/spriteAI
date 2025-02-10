@@ -2204,3 +2204,130 @@ export const sprite = {
 };
 
 sprite.addWeatherEffect = addWeatherEffect;
+
+async function generateSpritesheet(imageBuffer, spritesheetOptions = {}) {
+  const {
+    rows = 4,              // Number of animation states (idle, walk, run, etc.)
+    framesPerRow = 6,      // Frames per animation state
+    padding = 1,           // Padding between sprites
+    backgroundColor = { r: 0, g: 0, b: 0, alpha: 0 }
+  } = spritesheetOptions;
+
+  const metadata = await sharp(imageBuffer).metadata();
+  const frameWidth = Math.floor(metadata.width / framesPerRow);
+  const frameHeight = Math.floor(metadata.height / rows);
+
+  // Calculate new dimensions with padding
+  const newWidth = (frameWidth + padding) * framesPerRow - padding;
+  const newHeight = (frameHeight + padding) * rows - padding;
+
+  // Create blank spritesheet
+  const canvas = {
+    create: {
+      width: newWidth,
+      height: newHeight,
+      channels: 4,
+      background: backgroundColor
+    }
+  };
+
+  // Prepare frame overlays
+  const overlays = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < framesPerRow; col++) {
+      const frame = await sharp(imageBuffer)
+        .extract({
+          left: col * frameWidth,
+          top: row * frameHeight,
+          width: frameWidth,
+          height: frameHeight
+        })
+        .toBuffer();
+
+      overlays.push({
+        input: frame,
+        left: col * (frameWidth + padding),
+        top: row * (frameHeight + padding)
+      });
+    }
+  }
+
+  // Combine all frames into spritesheet
+  return await sharp(canvas)
+    .composite(overlays)
+    .toBuffer();
+}
+
+sprite.generateCharacterSpritesheet = async function(description, options = {}) {
+  const {
+    states = ['idle', 'walk', 'run', 'attack'],  // Animation states to generate
+    framesPerState = 6,                          // Frames per animation state
+    size = '1024x1024',                          // Output size
+    style = 'pixel-art',                         // Art style
+    padding = 1,                                 // Padding between sprites
+    direction = 'right'                          // Base direction of character
+  } = options;
+
+  // Generate the complete prompt for DALL-E
+  const statesDescription = states.map(state => `${state}ing`).join(', ');
+  const prompt = `Create a ${style} character spritesheet of ${description} with these animation states: ${statesDescription}.
+    Each row should be a different animation state with ${framesPerState} frames.
+    Character should face ${direction}.
+    Style requirements:
+    - Clean pixel art style
+    - Consistent character size across all frames
+    - White background
+    - Clear separation between frames
+    - ${states.length} rows of animations
+    - ${framesPerState} frames per row
+    - Each row represents a different animation state in sequence`;
+
+  const openAiObject = new OpenAI();
+  const response = await openAiObject.images.generate({
+    model: "dall-e-3",
+    prompt: prompt,
+    size: size,
+    n: 1
+  });
+
+  // Process the generated image
+  const res = await axios.get(response.data[0].url, { responseType: 'arraybuffer' });
+  const imgBuffer = Buffer.from(res.data);
+
+  // Generate the organized spritesheet with padding
+  const spritesheet = await generateSpritesheet(imgBuffer, {
+    rows: states.length,
+    framesPerRow: framesPerState,
+    padding: padding
+  });
+
+  // Save if requested
+  if (options.save) {
+    const currentWorkingDirectory = process.cwd();
+    const filename = `${currentWorkingDirectory}${path.sep}assets${path.sep}${description.replace(/\s+/g, '_')}_spritesheet.png`;
+    await sharp(spritesheet).toFile(filename);
+  }
+
+  return {
+    original: response.data[0].url,
+    spritesheet: `data:image/png;base64,${spritesheet.toString('base64')}`,
+    metadata: {
+      states: states,
+      framesPerState: framesPerState,
+      totalFrames: states.length * framesPerState,
+      dimensions: {
+        width: size.split('x')[0],
+        height: size.split('x')[1]
+      },
+      frameData: states.reduce((acc, state, index) => {
+        acc[state] = {
+          row: index,
+          frames: framesPerState,
+          startFrame: index * framesPerState,
+          endFrame: (index + 1) * framesPerState - 1
+        };
+        return acc;
+      }, {})
+    }
+  };
+};
