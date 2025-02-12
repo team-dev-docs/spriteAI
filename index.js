@@ -2354,3 +2354,46 @@ async function generateSpriteWithBorder(description, borderColor = { r: 0, g: 0,
 
 // Add the new function to the sprite object
 sprite.generateSpriteWithBorder = generateSpriteWithBorder;
+
+async function generateSpriteWithDropShadow(description, shadowOptions = {}, options = {}) {
+  const baseSprite = await sprite.generatePixelArt(description, options);
+  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+  
+  const {
+    opacity = 0.5,
+    blur = 5,
+    offsetX = 10,
+    offsetY = 10,
+    color = { r: 0, g: 0, b: 0, alpha: 255 }
+  } = shadowOptions;
+
+  const shadow = await sharp(imgBuffer)
+    .negate()
+    .linear(opacity, 0)
+    .blur(blur)
+    .tint(color)
+    .extend({
+      top: Math.max(0, -offsetY),
+      bottom: Math.max(0, offsetY),
+      left: Math.max(0, -offsetX),
+      right: Math.max(0, offsetX),
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    .toBuffer();
+
+  const withShadow = await sharp(shadow)
+    .composite([{ 
+      input: imgBuffer,
+      top: Math.max(0, offsetY),
+      left: Math.max(0, offsetX)
+    }])
+    .toBuffer();
+  
+  return {
+    original: baseSprite.image,
+    withShadow: `data:image/png;base64,${withShadow.toString('base64')}`
+  };
+}
+
+// Add the new function to the sprite object
+sprite.generateSpriteWithDropShadow = generateSpriteWithDropShadow;
