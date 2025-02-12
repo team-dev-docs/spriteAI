@@ -2414,3 +2414,25 @@ async function generateSpriteWithBlur(description, blurAmount = 5, options = {})
 
 // Add the new function to the sprite object
 sprite.generateSpriteWithBlur = generateSpriteWithBlur;
+
+async function generateSpriteWithSepia(description, sepiaAmount = 1, options = {}) {
+  const baseSprite = await sprite.generatePixelArt(description, options);
+  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+  
+  const sepia = await sharp(imgBuffer)
+    .modulate({
+      brightness: 1,
+      saturation: 0.3,
+      hue: 30
+    })
+    .tint({ r: 112, g: 66, b: 20 })
+    .toBuffer();
+  
+  return {
+    original: baseSprite.image,
+    sepia: `data:image/png;base64,${sepia.toString('base64')}`
+  };
+}
+
+// Add the new function to the sprite object
+sprite.generateSpriteWithSepia = generateSpriteWithSepia;
