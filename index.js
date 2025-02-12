@@ -2453,3 +2453,20 @@ async function generateSpriteWithGrayscale(description, options = {}) {
 
 // Add the new function to the sprite object
 sprite.generateSpriteWithGrayscale = generateSpriteWithGrayscale;
+
+async function generateSpriteWithInvert(description, options = {}) {
+  const baseSprite = await sprite.generatePixelArt(description, options);
+  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+  
+  const inverted = await sharp(imgBuffer)
+    .negate()
+    .toBuffer();
+  
+  return {
+    original: baseSprite.image,
+    inverted: `data:image/png;base64,${inverted.toString('base64')}`
+  };
+}
+
+// Add the new function to the sprite object
+sprite.generateSpriteWithInvert = generateSpriteWithInvert;
