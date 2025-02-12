@@ -2436,3 +2436,20 @@ async function generateSpriteWithSepia(description, sepiaAmount = 1, options = {
 
 // Add the new function to the sprite object
 sprite.generateSpriteWithSepia = generateSpriteWithSepia;
+
+async function generateSpriteWithGrayscale(description, options = {}) {
+  const baseSprite = await sprite.generatePixelArt(description, options);
+  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+  
+  const grayscale = await sharp(imgBuffer)
+    .grayscale()
+    .toBuffer();
+  
+  return {
+    original: baseSprite.image,
+    grayscale: `data:image/png;base64,${grayscale.toString('base64')}`
+  };
+}
+
+// Add the new function to the sprite object
+sprite.generateSpriteWithGrayscale = generateSpriteWithGrayscale;
