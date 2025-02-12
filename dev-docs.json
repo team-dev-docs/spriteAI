@@ -20,7 +20,7 @@
   "gitHubApp": {
     "connectedOrg": "spriteai",
     "approvalWorkflow": true,
-    "branches": "*",
+    "branches": ["*"],
     "userDocsWorkflows": ["generateUserDocs"],
     "issues": true
   }
