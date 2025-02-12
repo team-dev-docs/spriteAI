@@ -9,8 +9,8 @@ async function removeBackgroundColor(inputPath, outputPath, targetColor, colorTh
   //yeah fdsatea!
   const image = await Jimp.read(inputPath);
 
-    //upadte please!
-    const colorToReplace = Jimp.cssColorToHex(targetColor); // e.g., '#FFFFFF'
+    //upadte please!trgfggfh
+    const colorToReplace = Jimp.cssColorToHex(targetColor); // e.g.lol, '#FFFFFF'
 
     image.scan(0, 0, image.bitmap.width, image.bitmap.height, function (x, y, idx) {
         const red = this.bitmap.data[idx + 0];
@@ -18,7 +18,7 @@ async function removeBackgroundColor(inputPath, outputPath, targetColor, colorTh
         const blue = this.bitmap.data[idx + 2];
         const currentColor = Jimp.rgbaToInt(red, green, blue, 255);
 
-        // Calculate the color difference
+        // Calculate the color difference lolololooooo
         const colorDiff = Jimp.colorDiff({ r: red, g: green, b: blue }, Jimp.intToRGBA(colorToReplace));
 
         // If the color difference is less than the threshold, make it transparent
