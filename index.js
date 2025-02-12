@@ -2397,3 +2397,20 @@ async function generateSpriteWithDropShadow(description, shadowOptions = {}, opt
 
 // Add the new function to the sprite object
 sprite.generateSpriteWithDropShadow = generateSpriteWithDropShadow;
+
+async function generateSpriteWithBlur(description, blurAmount = 5, options = {}) {
+  const baseSprite = await sprite.generatePixelArt(description, options);
+  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+  
+  const blurred = await sharp(imgBuffer)
+    .blur(blurAmount)
+    .toBuffer();
+  
+  return {
+    original: baseSprite.image,
+    blurred: `data:image/png;base64,${blurred.toString('base64')}`
+  };
+}
+
+// Add the new function to the sprite object
+sprite.generateSpriteWithBlur = generateSpriteWithBlur;
