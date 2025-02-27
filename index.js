@@ -2201,6 +2201,26 @@ export const sprite = {
         }
       };
     },
+
+    async generateSpriteWithBorder(description, borderColor = { r: 0, g: 0, b: 0, alpha: 255 }, borderThickness = 1, options = {}) {
+      const baseSprite = await this.generatePixelArt(description, options);
+      const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
+      
+      const bordered = await sharp(imgBuffer)
+        .extend({
+          top: borderThickness,
+          bottom: borderThickness,
+          left: borderThickness,
+          right: borderThickness,
+          background: borderColor
+        })
+        .toBuffer();
+      
+      return {
+        original: baseSprite.image,
+        bordered: `data:image/png;base64,${bordered.toString('base64')}`
+      };
+    }
 };
 
 sprite.addWeatherEffect = addWeatherEffect;
@@ -2331,26 +2351,3 @@ sprite.generateCharacterSpritesheet = async function(description, options = {}) 
     }
   };
 };
-
-async function generateSpriteWithBorder(description, borderColor = { r: 0, g: 0, b: 0, alpha: 255 }, borderThickness = 1, options = {}) {
-  const baseSprite = await sprite.generatePixelArt(description, options);
-  const imgBuffer = Buffer.from(baseSprite.image.split(',')[1], 'base64');
-  
-  const bordered = await sharp(imgBuffer)
-    .extend({
-      top: borderThickness,
-      bottom: borderThickness,
-      left: borderThickness,
-      right: borderThickness,
-      background: borderColor
-    })
-    .toBuffer();
-  
-  return {
-    original: baseSprite.image,
-    bordered: `data:image/png;base64,${bordered.toString('base64')}`
-  };
-}
-
-// Add the new function to the sprite object
-sprite.generateSpriteWithBorder = generateSpriteWithBorder;

@@ -41,6 +41,27 @@ Generates a sprite sheet based on a description.
 async generateSprite(description, options = {})
 ```
 
+### 5. generateSpriteWithBorder
+**Location**: `/index.js`
+
+Generates a pixel art sprite with a customizable border.
+
+```javascript
+async function generateSpriteWithBorder(description, borderColor = { r: 0, g: 0, b: 0, alpha: 255 }, borderThickness = 1, options = {})
+```
+
+#### Parameters:
+- `description` (string): Description of the sprite to generate.
+- `borderColor` (object): Color of the border in RGBA format.
+- `borderThickness` (number): Thickness of the border in pixels.
+- `options` (object): Additional options for sprite generation.
+
+#### Example Usage:
+```javascript
+const spriteWithBorder = await sprite.generateSpriteWithBorder('knight', { r: 255, g: 0, b: 0, alpha: 255 }, 5);
+console.log(spriteWithBorder);
+```
+
 ## How to Extend
 
 1. **Add New Image Processing Function**
