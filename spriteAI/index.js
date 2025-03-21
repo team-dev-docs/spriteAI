@@ -101,3 +101,70 @@ export const fetchAvailableAnimationStates = async function() {
   const states = ['idle', 'walk', 'run', 'attack', 'jump', 'fall', 'hurt', 'die'];
   return states;
 };
+
+// New SDK function to fetch available sprite styles
+export const fetchAvailableSpriteStyles = async function() {
+  const styles = ['pixel-art', 'vector', '3d', 'hand-drawn', 'anime'];
+  return styles;
+};
+
+export const generateEnvironmentSprites = async function(description, options = {}) {
+  const {
+    elements = 4,
+    size = '1024x1024',
+    style = 'pixel-art',
+    padding = 1,
+    theme = 'fantasy'
+  } = options;
+
+  const prompt = `Create a ${style} tileset of ${description} environment with ${elements} different elements.
+    Style requirements:
+    - Clean ${style} style
+    - ${theme} theme
+    - White background
+    - Clear separation between elements
+    - ${elements} distinct environment pieces arranged in a grid
+    - Consistent scale and art style across all elements
+    - Suitable for a game environment`;
+
+  const openAiObject = new OpenAI();
+  const response = await openAiObject.images.generate({
+    model: "dall-e-3",
+    prompt: prompt,
+    size: size,
+    n: 1
+  });
+
+  const res = await axios.get(response.data[0].url, { responseType: 'arraybuffer' });
+  const imgBuffer = Buffer.from(res.data);
+
+  const tileset = await generateSpritesheet(imgBuffer, {
+    rows: Math.ceil(elements / 2),
+    framesPerRow: 2,
+    padding: padding
+  });
+
+  if (options.save) {
+    const currentWorkingDirectory = process.cwd();
+    const filename = `${currentWorkingDirectory}${path.sep}assets${path.sep}${description.replace(/\s+/g, '_')}_environment.png`;
+    await sharp(tileset).toFile(filename);
+  }
+
+  return {
+    original: response.data[0].url,
+    tileset: `data:image/png;base64,${tileset.toString('base64')}`,
+    metadata: {
+      elements: elements,
+      theme: theme,
+      dimensions: {
+        width: size.split('x')[0],
+        height: size.split('x')[1]
+      },
+      tileData: {
+        rows: Math.ceil(elements / 2),
+        columns: 2,
+        totalTiles: elements
+      }
+    }
+  };
+};
