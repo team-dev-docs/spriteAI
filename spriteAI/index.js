@@ -168,3 +168,66 @@ export const generateEnvironmentSprites = async function(description, options = 
     }
   };
 };
+
+export const generateItemSprites = async function(description, options = {}) {
+  const {
+    itemCount = 4,
+    size = '1024x1024',
+    style = 'pixel-art',
+    padding = 1,
+    itemType = 'equipment',
+    background = 'white'
+  } = options;
+
+  const prompt = `Create a ${style} collection of ${description} items for a game with ${itemCount} different items.
+    Style requirements:
+    - Clean ${style} style
+    - Items should be ${itemType}-type objects
+    - ${background} background
+    - Clear separation between items
+    - ${itemCount} distinct items arranged in a grid
+    - Consistent scale and art style across all items
+    - Each item should be centered in its grid cell
+    - Suitable for game inventory/pickup icons`;
+
+  const openAiObject = new OpenAI();
+  const response = await openAiObject.images.generate({
+    model: "dall-e-3",
+    prompt: prompt,
+    size: size,
+    n: 1
+  });
+
+  const res = await axios.get(response.data[0].url, { responseType: 'arraybuffer' });
+  const imgBuffer = Buffer.from(res.data);
+
+  const itemSheet = await generateSpritesheet(imgBuffer, {
+    rows: Math.ceil(itemCount / 2),
+    framesPerRow: 2,
+    padding: padding
+  });
+
+  if (options.save) {
+    const currentWorkingDirectory = process.cwd();
+    const filename = `${currentWorkingDirectory}${path.sep}assets${path.sep}${description.replace(/\s+/g, '_')}_items.png`;
+    await sharp(itemSheet).toFile(filename);
+  }
+
+  return {
+    original: response.data[0].url,
+    itemSheet: `data:image/png;base64,${itemSheet.toString('base64')}`,
+    metadata: {
+      itemCount: itemCount,
+      itemType: itemType,
+      dimensions: {
+        width: size.split('x')[0],
+        height: size.split('x')[1]
+      },
+      itemData: {
+        rows: Math.ceil(itemCount / 2),
+        columns: 2,
+        totalItems: itemCount
+      }
+    }
+  };
+};
