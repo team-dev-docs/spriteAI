@@ -69,6 +69,59 @@ removeBackgroundColor(inputPath, outputPath, targetColor, colorThreshold)
   });
 ```
 
+### Generating Environment Sprites
+
+To generate environment tilesets, you can use the `generateEnvironmentSprites` function from the `spriteAI/index.js` file. Here’s an example:
+
+```javascript
+import { generateEnvironmentSprites } from './spriteAI/index.js';
+
+const description = 'a fantasy forest';
+const options = {
+  elements: 6,
+  size: '1024x1024',
+  style: 'pixel-art',
+  padding: 2,
+  theme: 'fantasy',
+  save: true
+};
+
+generateEnvironmentSprites(description, options)
+  .then(result => {
+    console.log('Environment sprites generated:', result.tileset);
+  })
+  .catch(error => {
+    console.error('Error generating environment sprites:', error);
+  });
+```
+
+### Generating Item Sprites
+
+To generate item collections, you can use the `generateItemSprites` function from the `spriteAI/index.js` file. Here’s an example:
+
+```javascript
+import { generateItemSprites } from './spriteAI/index.js';
+
+const description = 'medieval weapons';
+const options = {
+  itemCount: 8,
+  size: '1024x1024',
+  style: 'pixel-art',
+  padding: 2,
+  itemType: 'weapon',
+  background: 'transparent',
+  save: true
+};
+
+generateItemSprites(description, options)
+  .then(result => {
+    console.log('Item sprites generated:', result.itemSheet);
+  })
+  .catch(error => {
+    console.error('Error generating item sprites:', error);
+  });
+```
+
 ## Directory Structure
 
 - `index.js`: Main logic for generating spritesheets and removing backgrounds.

@@ -1,4 +1,3 @@
-// filepath: /spriteAI/index.js
 import OpenAI from "openai";
 import axios from "axios";
 import sharp from "sharp";

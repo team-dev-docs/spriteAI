@@ -62,6 +62,108 @@ const spriteWithBorder = await sprite.generateSpriteWithBorder('knight', { r: 25
 console.log(spriteWithBorder);
 ```
 
+### 6. generateEnvironmentSprites
+**Location**: `/spriteAI/index.js`
+
+Generates environment tilesets based on a description.
+
+```javascript
+async function generateEnvironmentSprites(description, options = {})
+```
+
+#### Parameters:
+- `description` (string): Description of the environment to generate.
+- `options` (object): Configuration options for the tileset generation.
+
+#### Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| elements | number | 4 | Number of different elements in the tileset |
+| size | string | '1024x1024' | Output image size |
+| style | string | 'pixel-art' | Art style to use |
+| padding | number | 1 | Padding between tiles |
+| theme | string | 'fantasy' | Theme of the environment |
+
+#### Example Usage:
+```javascript
+const environmentSprites = await generateEnvironmentSprites('a fantasy forest', {
+  elements: 6,
+  size: '1024x1024',
+  style: 'pixel-art',
+  padding: 2,
+  theme: 'fantasy',
+  save: true
+});
+console.log(environmentSprites.tileset);
+```
+
+### 7. generateItemSprites
+**Location**: `/spriteAI/index.js`
+
+Generates item collections based on a description.
+
+```javascript
+async function generateItemSprites(description, options = {})
+```
+
+#### Parameters:
+- `description` (string): Description of the items to generate.
+- `options` (object): Configuration options for the item generation.
+
+#### Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| itemCount | number | 4 | Number of different items in the collection |
+| size | string | '1024x1024' | Output image size |
+| style | string | 'pixel-art' | Art style to use |
+| padding | number | 1 | Padding between items |
+| itemType | string | 'equipment' | Type of items to generate |
+| background | string | 'white' | Background color of the items |
+
+#### Example Usage:
+```javascript
+const itemSprites = await generateItemSprites('medieval weapons', {
+  itemCount: 8,
+  size: '1024x1024',
+  style: 'pixel-art',
+  padding: 2,
+  itemType: 'weapon',
+  background: 'transparent',
+  save: true
+});
+console.log(itemSprites.itemSheet);
+```
+
+### 8. fetchAvailableAnimationStates
+**Location**: `/spriteAI/index.js`
+
+Fetches available animation states.
+
+```javascript
+async function fetchAvailableAnimationStates()
+```
+
+#### Example Usage:
+```javascript
+const animationStates = await fetchAvailableAnimationStates();
+console.log(animationStates);
+```
+
+### 9. fetchAvailableSpriteStyles
+**Location**: `/spriteAI/index.js`
+
+Fetches available sprite styles.
+
+```javascript
+async function fetchAvailableSpriteStyles()
+```
+
+#### Example Usage:
+```javascript
+const spriteStyles = await fetchAvailableSpriteStyles();
+console.log(spriteStyles);
+```
+
 ## How to Extend
 
 1. **Add New Image Processing Function**
