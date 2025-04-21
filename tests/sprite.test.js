@@ -2,6 +2,7 @@ const sprite = require('./index').sprite;
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const { generateEnvironmentSprites, generateItemSprites, fetchAvailableAnimationStates, fetchAvailableSpriteStyles } = require('../spriteAI/index');
 
 describe('sprite', () => {
   describe('generateSprite', () => {
@@ -45,5 +46,68 @@ describe('sprite', () => {
     });
 
     // Add more test cases as needed
+  });
+});
+
+describe('generateEnvironmentSprites', () => {
+  it('should generate environment sprites with the correct dimensions', async () => {
+    const description = 'a fantasy forest';
+    const options = {
+      elements: 6,
+      size: '1024x1024',
+      style: 'pixel-art',
+      padding: 2,
+      theme: 'fantasy',
+      save: false
+    };
+    const result = await generateEnvironmentSprites(description, options);
+
+    expect(result).toBeDefined();
+    expect(result.tileset).toBeDefined();
+    expect(result.metadata).toBeDefined();
+    expect(result.metadata.elements).toBe(options.elements);
+    expect(result.metadata.theme).toBe(options.theme);
+  });
+});
+
+describe('generateItemSprites', () => {
+  it('should generate item sprites with the correct dimensions', async () => {
+    const description = 'medieval weapons';
+    const options = {
+      itemCount: 8,
+      size: '1024x1024',
+      style: 'pixel-art',
+      padding: 2,
+      itemType: 'weapon',
+      background: 'transparent',
+      save: false
+    };
+    const result = await generateItemSprites(description, options);
+
+    expect(result).toBeDefined();
+    expect(result.itemSheet).toBeDefined();
+    expect(result.metadata).toBeDefined();
+    expect(result.metadata.itemCount).toBe(options.itemCount);
+    expect(result.metadata.itemType).toBe(options.itemType);
+  });
+});
+
+describe('fetchAvailableAnimationStates', () => {
+  it('should fetch available animation states', async () => {
+    const result = await fetchAvailableAnimationStates();
+
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe('fetchAvailableSpriteStyles', () => {
+  it('should fetch available sprite styles', async () => {
+    const result = await fetchAvailableSpriteStyles();
+
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
   });
 });
