@@ -231,3 +231,37 @@ export const generateItemSprites = async function(description, options = {}) {
     }
   };
 };
+
+// New convenience functions for specific character types
+export const generateNinja = async function(options = {}) {
+  const defaultOptions = {
+    states: ['idle', 'walk', 'run', 'attack', 'sneak'],
+    style: 'pixel-art',
+    framesPerState: 6
+  };
+  const mergedOptions = { ...defaultOptions, ...options };
+  
+  return generateCharacterSpritesheet('ninja character with black outfit and mask', mergedOptions);
+};
+
+export const generateSpaceman = async function(options = {}) {
+  const defaultOptions = {
+    states: ['idle', 'walk', 'run', 'float'],
+    style: 'pixel-art',
+    framesPerState: 6
+  };
+  const mergedOptions = { ...defaultOptions, ...options };
+  
+  return generateCharacterSpritesheet('astronaut character with space suit and helmet', mergedOptions);
+};
+
+export const generateRobot = async function(options = {}) {
+  const defaultOptions = {
+    states: ['idle', 'walk', 'run', 'attack', 'power-up'],
+    style: 'pixel-art',
+    framesPerState: 6
+  };
+  const mergedOptions = { ...defaultOptions, ...options };
+  
+  return generateCharacterSpritesheet('robot character with mechanical limbs and glowing eyes', mergedOptions);
+};
