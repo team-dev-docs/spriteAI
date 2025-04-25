@@ -1,27 +1,9 @@
 {
-  "quickDoc": {
-    "variablesAndFunctions": {
-      "prompts": [
-        {
-          "question": "does this code use a third party libary",
-          "title": "Third Party libaries"
-        }
-      ]
-    }
-  },
-  "ai": {
-    "internalTypeFilters": [
-      "function",
-      "class",
-      "method"
-    ],
-    "contextPrompt": "can you write overview of this codefile and provide mermaid diagram of how it works"
-  },
   "gitHubApp": {
-    "connectedOrg": "spriteai",
     "approvalWorkflow": true,
-    "branches": ["*"],
-    "userDocsWorkflows": ["generateUserDocs"],
+    "userDocsWorkflows": [
+      "generateUserDocs"
+    ],
     "issues": true
   }
 }
