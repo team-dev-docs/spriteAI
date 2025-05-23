@@ -1,1 +1,88 @@
-{}
+{
+  "dev-docs/context-scenes-MainScene.js.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-spriteai-functions-documentation.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/reference.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "index.js": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "tests/removeBackground.test.js": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "tests/sprite.test.js": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "spriteAI/README.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "spriteAI/index.js": {
+    "downstream_files": [
+      "spriteAI/index.js"
+    ],
+    "commits": [
+      "4de5ed29c7b672ecbf5e5168ac3e65a49e1bf4e8",
+      "6843b31dd440bc37f50050e655080b3cd2d16138",
+      "a72534860391a2fa89a7e43a6004509919e1749a"
+    ]
+  },
+  "spriteAI/package.json": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-animation_states.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-api_integration.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-background_removal.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-character_spritesheet_generation.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-codebase_structure.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-coding_standards.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-external_dependencies.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-image_processing_pipeline.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-landscape_sprite_generation.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-project_setup.md": {
+    "downstream_files": [],
+    "commits": []
+  },
+  "dev-docs/misc-testing_guidelines.md": {
+    "downstream_files": [],
+    "commits": []
+  }
+}
